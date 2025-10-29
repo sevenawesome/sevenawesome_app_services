@@ -33,12 +33,42 @@ class MarriageEndReason(models.Model):
 
     def __str__(self):
         return self.label
+    
+class Nationality(models.Model):
+    code = models.CharField(max_length=20, unique=True)
+    label = models.CharField(max_length=100)
+    is_active = models.BooleanField(default=True)
+    order = models.PositiveSmallIntegerField(default=0)
 
+    def __str__(self):
+        return self.label
+
+class Language(models.Model):
+    code = models.CharField(max_length=10, unique=True)   # e.g., es, en, fr
+    label = models.CharField(max_length=100)
+    is_active = models.BooleanField(default=True)
+    order = models.PositiveSmallIntegerField(default=0)
+
+    def __str__(self):
+        return self.label
 
 class Country(models.Model):
     code = models.CharField(max_length=5, unique=True)   # e.g., DO, US
     name = models.CharField(max_length=100)
-    nationality = models.CharField(max_length=100, blank=True, null=True)
+    nationality = models.ForeignKey(
+        Nationality,
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name="people_with_nationality",
+    )
+    native_language = models.ForeignKey(
+        Language,
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name="countries_as_native_language",
+    )
     is_active = models.BooleanField(default=True)
     order = models.PositiveSmallIntegerField(default=0)
 
@@ -85,8 +115,8 @@ class Location(models.Model):
     description = models.CharField(max_length=255, blank=True, null=True)
     address_line1 = models.CharField(max_length=150, blank=True, null=True)
     address_line2 = models.CharField(max_length=150, blank=True, null=True)
-    city = models.ForeignKey(
-        City,
+    country = models.ForeignKey(
+        Country,
         on_delete=models.SET_NULL,
         blank=True,
         null=True,
@@ -99,8 +129,8 @@ class Location(models.Model):
         null=True,
         related_name="locations",
     )
-    country = models.ForeignKey(
-        Country,
+    city = models.ForeignKey(
+        City,
         on_delete=models.SET_NULL,
         blank=True,
         null=True,
@@ -121,24 +151,6 @@ class Location(models.Model):
             return f"{self.latitude}, {self.longitude}"
         return "Location"
 
-
-class Nationality(models.Model):
-    code = models.CharField(max_length=20, unique=True)
-    label = models.CharField(max_length=100)
-    country = models.ForeignKey(
-        Country,
-        on_delete=models.SET_NULL,
-        blank=True,
-        null=True,
-        related_name="nationalities",
-    )
-    is_active = models.BooleanField(default=True)
-    order = models.PositiveSmallIntegerField(default=0)
-
-    def __str__(self):
-        return self.label
-
-
 class SocialNetworkPlatform(models.Model):
     code = models.CharField(max_length=30, unique=True)   # e.g., facebook, instagram
     name = models.CharField(max_length=100)
@@ -148,16 +160,6 @@ class SocialNetworkPlatform(models.Model):
 
     def __str__(self):
         return self.name
-
-
-class Language(models.Model):
-    code = models.CharField(max_length=10, unique=True)   # e.g., es, en, fr
-    label = models.CharField(max_length=100)
-    is_active = models.BooleanField(default=True)
-    order = models.PositiveSmallIntegerField(default=0)
-
-    def __str__(self):
-        return self.label
         
 class PersonIdentityType(models.Model):
     code = models.CharField(max_length=20, unique=True)   # e.g., C,P
@@ -229,25 +231,6 @@ class Person(models.Model):
         blank=True,
         null=True,
         related_name="people_in_city",
-    )
-    nationality = models.ForeignKey(
-        Nationality,
-        on_delete=models.SET_NULL,
-        blank=True,
-        null=True,
-        related_name="people_with_nationality",
-    )
-    native_language = models.ForeignKey(
-        Language,
-        blank=True,
-        null= True,
-        related_name="people_native_language",
-        on_delete=models.SET_NULL,
-    )
-    preferred_languages = models.ManyToManyField(
-        Language,
-        blank=True,
-        related_name="people_preferred_languages"
     )
     current_address = models.ForeignKey(
         Location,
@@ -368,6 +351,50 @@ class Person(models.Model):
     def spouse_history(self):
         return self.get_marriages().order_by("-married_on")
 
+class LanguagesProficiencyLevels(models.Model):
+    code = models.CharField(max_length=20, unique=True)   # Beginner (A1),Elementary (A2)
+    label = models.CharField(max_length=50)   # display label Can understand and use basic phrases. Limited vocabulary and grammar.
+    description = models.CharField(max_length=300, blank=True, null=True)            
+    is_active = models.BooleanField(default=True)
+
+    def __str__(self):
+        return self.label
+    """
+        Beginner (A1): Can understand and use basic phrases. Limited vocabulary and grammar.
+        Elementary (A2): Can handle simple conversations and write short texts.
+        Intermediate (B1): Can deal with everyday situations, express opinions, and understand main ideas.
+        Upper Intermediate (B2): Can interact fluently, understand complex texts, and write detailed content.
+        Advanced (C1): Can use the language effectively in professional and academic settings.
+        Proficient/Fluent (C2): Near-native level. Can understand virtually everything and express themselves effortlessly.
+        Native: Learned the language from birth. Full cultural and linguistic fluency.
+    
+    """
+
+class PersonLanguages(models.Model):
+    person = models.ForeignKey(Person,on_delete=models.CASCADE,related_name="person_languages",)
+    language = models.ForeignKey(Language,on_delete=models.CASCADE,related_name="people_preferred_languages")
+    language_proficiency_level = models.ForeignKey(LanguagesProficiencyLevels,on_delete=models.CASCADE, related_name="people_proficiency_level")
+    is_preferred = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        identifier = self.handle or self.url or ""
+        return f"{self.person} on {self.platform}{f' ({identifier})' if identifier else ''}"
+
+class PersonSocialNetwork(models.Model):
+    person = models.ForeignKey(Person,on_delete=models.CASCADE,related_name="social_profiles",)
+    platform = models.ForeignKey(SocialNetworkPlatform,on_delete=models.CASCADE,related_name="person_profiles",)
+    handle = models.CharField(max_length=150, blank=True, null=True)
+    url = models.URLField(blank=True, null=True)
+    is_primary = models.BooleanField(default=False)
+    notes = models.CharField(max_length=255, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        identifier = self.handle or self.url or ""
+        return f"{self.person} on {self.platform}{f' ({identifier})' if identifier else ''}"
 
 class PersonSocialNetwork(models.Model):
     person = models.ForeignKey(Person,on_delete=models.CASCADE,related_name="social_profiles",)

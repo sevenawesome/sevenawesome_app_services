@@ -440,13 +440,32 @@ class PersonEmergencyContact(models.Model):
         return f"{self.name} ({self.person})"
 
 
+class HealthCondition(models.Model):
+    code = models.CharField(max_length=50, unique=True)
+    name = models.CharField(max_length=150)
+    description = models.TextField(blank=True, null=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("name",)
+
+    def __str__(self):
+        return self.name
+
+
 class PersonHealthStatus(models.Model):
     person = models.ForeignKey(
         Person,
         on_delete=models.CASCADE,
         related_name="health_statuses",
     )
-    status = models.CharField(max_length=150)
+    condition = models.ForeignKey(
+        HealthCondition,
+        on_delete=models.PROTECT,
+        related_name="people_with_condition",
+    )
     description = models.TextField(blank=True, null=True)
     diagnosed_on = models.DateField(blank=True, null=True)
     resolved_on = models.DateField(blank=True, null=True)
@@ -471,7 +490,7 @@ class PersonHealthStatus(models.Model):
 
     def __str__(self):
         when = self.diagnosed_on.isoformat() if self.diagnosed_on else "undated"
-        return f"{self.person} - {self.status} ({when})"
+        return f"{self.person} - {self.condition.name} ({when})"
 
 
 class LanguagesProficiencyLevels(models.Model):

@@ -260,11 +260,6 @@ class Person(models.Model):
         null=True,
         related_name="people_with_marital_status",
     )
-    photo = models.CharField(max_length=400, blank=True, null=True)
-    emergency_contact_name = models.CharField(max_length=150, blank=True, null=True)
-    emergency_contact_relationship = models.CharField(max_length=100, blank=True, null=True)
-    emergency_contact_phone = models.CharField(max_length=50, blank=True, null=True)
-    emergency_contact_email = models.EmailField(blank=True, null=True)
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -350,6 +345,85 @@ class Person(models.Model):
 
     def spouse_history(self):
         return self.get_marriages().order_by("-married_on")
+
+    def latest_photo(self):
+        """Return the most recent photo, prioritizing any marked as primary."""
+        return (
+            self.photos.filter(is_primary=True)
+            .order_by("-captured_on", "-created_at")
+            .first()
+            or self.photos.order_by("-captured_on", "-created_at").first()
+        )
+
+    def primary_emergency_contact(self):
+        """Return the contact explicitly marked as primary, if any."""
+        return self.emergency_contacts.filter(is_primary=True).first()
+
+
+class PersonPhoto(models.Model):
+    person = models.ForeignKey(
+        Person,
+        on_delete=models.CASCADE,
+        related_name="photos",
+    )
+    image_url = models.CharField(max_length=400)
+    image_name = models.CharField(max_length=400)
+    captured_on = models.DateField(blank=True, null=True)
+    description = models.CharField(max_length=255, blank=True, null=True)
+    is_primary = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = (
+            "-is_primary",
+            "-captured_on",
+            "-created_at",
+        )
+        constraints = [
+            models.UniqueConstraint(
+                fields=("person",),
+                condition=Q(is_primary=True),
+                name="unique_primary_photo_per_person",
+            ),
+        ]
+
+    def __str__(self):
+        when = self.captured_on.isoformat() if self.captured_on else "undated"
+        return f"{self.person} photo ({when})"
+
+
+class PersonEmergencyContact(models.Model):
+    person = models.ForeignKey(
+        Person,
+        on_delete=models.CASCADE,
+        related_name="emergency_contacts",
+    )
+    name = models.CharField(max_length=150)
+    relationship = models.CharField(max_length=100, blank=True, null=True)
+    phone = models.CharField(max_length=50, blank=True, null=True)
+    email = models.EmailField(blank=True, null=True)
+    is_primary = models.BooleanField(default=False)
+    notes = models.CharField(max_length=255, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = (
+            "-is_primary",
+            "name",
+        )
+        constraints = [
+            models.UniqueConstraint(
+                fields=("person",),
+                condition=Q(is_primary=True),
+                name="unique_primary_emergency_contact_per_person",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.name} ({self.person})"
+
 
 class LanguagesProficiencyLevels(models.Model):
     code = models.CharField(max_length=20, unique=True)   # Beginner (A1),Elementary (A2)

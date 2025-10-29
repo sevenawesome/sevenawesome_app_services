@@ -246,6 +246,7 @@ class Person(models.Model):
         null=True,
         related_name="people_with_education",
     )
+    is_studing = models.BooleanField(default=False)
     occupation = models.ForeignKey(
         Occupation,
         on_delete=models.DO_NOTHING,
@@ -253,6 +254,7 @@ class Person(models.Model):
         null=True,
         related_name="people_with_occupation",
     )
+    is_employed = models.BooleanField(default=False)
     marital_status = models.ForeignKey(
         MaritalStatus,
         on_delete=models.SET_NULL,
@@ -359,6 +361,19 @@ class Person(models.Model):
         """Return the contact explicitly marked as primary, if any."""
         return self.emergency_contacts.filter(is_primary=True).first()
 
+    def current_health_status(self):
+        """Return the health status flagged as current or the most recent record."""
+        return (
+            self.health_statuses.filter(is_current=True)
+            .order_by("-diagnosed_on", "-created_at")
+            .first()
+            or self.health_statuses.order_by("-diagnosed_on", "-created_at").first()
+        )
+
+    def health_status_history(self):
+        """Return all health status records ordered from most to least recent."""
+        return self.health_statuses.order_by("-diagnosed_on", "-created_at")
+
 
 class PersonPhoto(models.Model):
     person = models.ForeignKey(
@@ -423,6 +438,40 @@ class PersonEmergencyContact(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.person})"
+
+
+class PersonHealthStatus(models.Model):
+    person = models.ForeignKey(
+        Person,
+        on_delete=models.CASCADE,
+        related_name="health_statuses",
+    )
+    status = models.CharField(max_length=150)
+    description = models.TextField(blank=True, null=True)
+    diagnosed_on = models.DateField(blank=True, null=True)
+    resolved_on = models.DateField(blank=True, null=True)
+    is_current = models.BooleanField(default=True)
+    notes = models.CharField(max_length=255, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = (
+            "-is_current",
+            "-diagnosed_on",
+            "-created_at",
+        )
+        constraints = [
+            models.UniqueConstraint(
+                fields=("person",),
+                condition=Q(is_current=True),
+                name="unique_current_health_status_per_person",
+            ),
+        ]
+
+    def __str__(self):
+        when = self.diagnosed_on.isoformat() if self.diagnosed_on else "undated"
+        return f"{self.person} - {self.status} ({when})"
 
 
 class LanguagesProficiencyLevels(models.Model):

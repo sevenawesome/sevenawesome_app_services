@@ -50,6 +50,20 @@ class RelationshipType(models.Model):
     def __str__(self):
         return self.label
 
+
+class PersonAttributeType(models.Model):
+    code = models.CharField(max_length=30, unique=True)
+    name = models.CharField(max_length=100)
+    description = models.TextField(blank=True, null=True)
+    is_active = models.BooleanField(default=True)
+    order = models.PositiveSmallIntegerField(default=0)
+
+    class Meta:
+        ordering = ("order", "name")
+
+    def __str__(self):
+        return self.name
+
 class Nationality(models.Model):
     code = models.CharField(max_length=20, unique=True)
     label = models.CharField(max_length=100)
@@ -448,6 +462,46 @@ class Person(models.Model):
         """Convenience flag indicating whether a dating relationship exists."""
         return self.current_dating_partner() is not None
 
+    def get_attribute_assignments(self, include_inactive=False):
+        """
+        Return attribute assignments for the person.
+        By default only current (non-ended) assignments are returned.
+        """
+        assignments = self.attribute_assignments.select_related(
+            "attribute",
+            "attribute__attribute_type",
+        ).order_by(
+            "attribute__attribute_type__order",
+            "attribute__attribute_type__name",
+            "attribute__order",
+            "attribute__name",
+        )
+        if include_inactive:
+            return assignments
+        return assignments.filter(ended_on__isnull=True)
+
+    def attributes(self, include_inactive=False):
+        """
+        Return a queryset of PersonAttribute instances associated with the person.
+        """
+        filters = {}
+        if not include_inactive:
+            filters["person_assignments__ended_on__isnull"] = True
+        return (
+            PersonAttribute.objects.filter(
+                person_assignments__person=self,
+                **filters,
+            )
+            .select_related("attribute_type")
+            .order_by(
+                "attribute_type__order",
+                "attribute_type__name",
+                "order",
+                "name",
+            )
+            .distinct()
+        )
+
     def spouse_history(self):
         return self.get_marriages().order_by("-married_on")
 
@@ -533,6 +587,35 @@ class PersonPhoto(models.Model):
         when = self.captured_on.isoformat() if self.captured_on else "undated"
         return f"{self.person} photo ({when})"
 
+class PersonAttribute(models.Model):
+    attribute_type = models.ForeignKey(
+        PersonAttributeType,
+        on_delete=models.PROTECT,
+        related_name="attributes",
+    )
+    person = models.ForeignKey(
+        Person,
+        on_delete=models.CASCADE,
+        related_name="person_attributes",
+        blank=True,
+        null=True,
+    )
+    code = models.CharField(max_length=50, unique=True)
+    name = models.CharField(max_length=150)
+    description = models.TextField(blank=True, null=True)
+    is_active = models.BooleanField(default=True)
+    order = models.PositiveSmallIntegerField(default=0)
+
+    class Meta:
+        ordering = (
+            "attribute_type__order",
+            "attribute_type__name",
+            "order",
+            "name",
+        )
+
+    def __str__(self):
+        return self.name
 
 class PersonEmergencyContact(models.Model):
     person = models.ForeignKey(
@@ -802,6 +885,43 @@ class PersonRelationship(models.Model):
         status = "ended" if self.ended_on else "current"
         label = self.relationship_type.label if self.relationship_type else "Unspecified"
         return f"{self.person} & {self.partner} - {label} ({status})"
+
+    @property
+    def is_current(self):
+        return self.ended_on is None
+
+
+class PersonAttributeAssignment(models.Model):
+    person = models.ForeignKey(
+        Person,
+        on_delete=models.CASCADE,
+        related_name="attribute_assignments",
+    )
+    attribute = models.ForeignKey(
+        PersonAttribute,
+        on_delete=models.PROTECT,
+        related_name="person_assignments",
+    )
+    proficiency = models.CharField(max_length=100, blank=True, null=True)
+    started_on = models.DateField(blank=True, null=True)
+    ended_on = models.DateField(blank=True, null=True)
+    notes = models.CharField(max_length=255, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("-started_on", "-created_at")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("person", "attribute"),
+                condition=Q(ended_on__isnull=True),
+                name="unique_active_attribute_per_person",
+            ),
+        ]
+
+    def __str__(self):
+        status = "ended" if self.ended_on else "current"
+        return f"{self.person} - {self.attribute} ({status})"
 
     @property
     def is_current(self):

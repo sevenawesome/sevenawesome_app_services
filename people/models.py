@@ -187,6 +187,17 @@ class  Occupation(models.Model):
     def __str__(self):
         return self.label
     
+class DeathCause(models.Model):
+    code = models.CharField(max_length=50, unique=True)
+    name = models.CharField(max_length=150)
+    description = models.TextField(blank=True, null=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return self.name
+    
 # --------------------------
 # Person
 # --------------------------
@@ -211,6 +222,15 @@ class Person(models.Model):
     cellphone = models.CharField(max_length=50, blank=True, null=True)
     housephone = models.CharField(max_length=50, blank=True, null=True)
     date_of_birth = models.DateField(blank=True, null=True)
+    is_deceased = models.BooleanField(default=False)
+    date_of_death = models.DateField(blank=True, null=True)
+    cause_of_death = models.ForeignKey(
+        DeathCause,
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name="deceased_people",
+    )
     birth_country = models.ForeignKey(
         Country,
         on_delete=models.SET_NULL,
@@ -373,6 +393,17 @@ class Person(models.Model):
     def health_status_history(self):
         """Return all health status records ordered from most to least recent."""
         return self.health_statuses.order_by("-diagnosed_on", "-created_at")
+
+    @property
+    def is_alive(self):
+        return not self.is_deceased
+
+    def death_details(self):
+        """Return (date, cause) tuple if the person is marked as deceased."""
+        if not self.is_deceased:
+            return None
+        cause = self.cause_of_death.name if self.cause_of_death else None
+        return self.date_of_death, cause
 
 
 class PersonPhoto(models.Model):

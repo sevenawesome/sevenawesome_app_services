@@ -1,7 +1,9 @@
 from django.conf import settings
 from django.db import models
-from django.db.models import Q
+from django.db.models import F, Q
 from django.utils import timezone
+
+DATING_RELATIONSHIP_CODE = "dating"
 
 # --------------------------
 # Lookup tables
@@ -34,6 +36,20 @@ class MarriageEndReason(models.Model):
     def __str__(self):
         return self.label
     
+
+class RelationshipType(models.Model):
+    code = models.CharField(max_length=30, unique=True)
+    label = models.CharField(max_length=100)
+    description = models.TextField(blank=True, null=True)
+    is_active = models.BooleanField(default=True)
+    order = models.PositiveSmallIntegerField(default=0)
+
+    class Meta:
+        ordering = ("order", "label")
+
+    def __str__(self):
+        return self.label
+
 class Nationality(models.Model):
     code = models.CharField(max_length=20, unique=True)
     label = models.CharField(max_length=100)
@@ -401,6 +417,37 @@ class Person(models.Model):
             return None
         return marriage.husband if marriage.wife_id == self.pk else marriage.wife
 
+    def dating_relationships(self):
+        """Return dating relationships (current and past) involving this person."""
+        return PersonRelationship.objects.filter(
+            Q(person=self) | Q(partner=self),
+            relationship_type__code=DATING_RELATIONSHIP_CODE,
+        ).select_related("relationship_type")
+
+    def current_dating_relationship(self):
+        """Return the active dating relationship, if any."""
+        return (
+            self.dating_relationships()
+            .filter(ended_on__isnull=True)
+            .order_by("-started_on", "-created_at")
+            .select_related("person", "partner")
+            .first()
+        )
+
+    def current_dating_partner(self):
+        """Return the partner in the active dating relationship."""
+        relationship = self.current_dating_relationship()
+        if not relationship:
+            return None
+        if relationship.person_id == self.pk:
+            return relationship.partner
+        return relationship.person
+
+    @property
+    def has_boyfriend_or_girlfriend(self):
+        """Convenience flag indicating whether a dating relationship exists."""
+        return self.current_dating_partner() is not None
+
     def spouse_history(self):
         return self.get_marriages().order_by("-married_on")
 
@@ -707,6 +754,57 @@ class Marriage(models.Model):
 
     @property
     def is_active(self):
+        return self.ended_on is None
+
+
+class PersonRelationship(models.Model):
+    person = models.ForeignKey(
+        Person,
+        on_delete=models.CASCADE,
+        related_name="relationships_as_person",
+    )
+    partner = models.ForeignKey(
+        Person,
+        on_delete=models.CASCADE,
+        related_name="relationships_as_partner",
+    )
+    relationship_type = models.ForeignKey(
+        RelationshipType,
+        on_delete=models.PROTECT,
+        related_name="relationships",
+    )
+    started_on = models.DateField(blank=True, null=True)
+    ended_on = models.DateField(blank=True, null=True)
+    notes = models.CharField(max_length=255, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("-started_on", "-created_at")
+        constraints = [
+            models.CheckConstraint(
+                check=~Q(person=F("partner")),
+                name="prevent_self_relationship",
+            ),
+            models.UniqueConstraint(
+                fields=("person", "partner", "relationship_type"),
+                condition=Q(ended_on__isnull=True),
+                name="unique_active_relationship_pair",
+            ),
+        ]
+
+    def save(self, *args, **kwargs):
+        if self.person_id and self.partner_id and self.person_id > self.partner_id:
+            self.person_id, self.partner_id = self.partner_id, self.person_id
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        status = "ended" if self.ended_on else "current"
+        label = self.relationship_type.label if self.relationship_type else "Unspecified"
+        return f"{self.person} & {self.partner} - {label} ({status})"
+
+    @property
+    def is_current(self):
         return self.ended_on is None
 
 

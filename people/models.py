@@ -178,6 +178,20 @@ class EducationalLevel(models.Model):
     def __str__(self):
         return self.label
     
+class Degree(models.Model):
+    code = models.CharField(max_length=50, unique=True)
+    name = models.CharField(max_length=150)
+    description = models.TextField(blank=True, null=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("name",)
+
+    def __str__(self):
+        return self.name
+    
 class  Occupation(models.Model):
     code = models.CharField(max_length=20, unique=True)   # e.g., DF,PL,AC
     label = models.CharField(max_length=50)   # display label plomero,ama de casa..
@@ -405,6 +419,18 @@ class Person(models.Model):
         cause = self.cause_of_death.name if self.cause_of_death else None
         return self.date_of_death, cause
 
+    def degree_history(self):
+        """Return all recorded degree studies ordered by most recent completion."""
+        return self.person_degrees.select_related("degree").order_by(
+            "-end_year",
+            "-start_year",
+            "degree__name",
+        )
+
+    def current_degrees(self):
+        """Return degree records that are still in progress."""
+        return self.person_degrees.select_related("degree").filter(is_completed=False)
+
 
 class PersonPhoto(models.Model):
     person = models.ForeignKey(
@@ -522,6 +548,43 @@ class PersonHealthStatus(models.Model):
     def __str__(self):
         when = self.diagnosed_on.isoformat() if self.diagnosed_on else "undated"
         return f"{self.person} - {self.condition.name} ({when})"
+
+
+class PersonDegree(models.Model):
+    person = models.ForeignKey(
+        Person,
+        on_delete=models.CASCADE,
+        related_name="person_degrees",
+    )
+    degree = models.ForeignKey(
+        Degree,
+        on_delete=models.PROTECT,
+        related_name="people_with_degree",
+    )
+    institution = models.CharField(max_length=150, blank=True, null=True)
+    field_of_study = models.CharField(max_length=150, blank=True, null=True)
+    start_year = models.PositiveIntegerField(blank=True, null=True)
+    end_year = models.PositiveIntegerField(blank=True, null=True)
+    is_completed = models.BooleanField(default=True)
+    notes = models.CharField(max_length=255, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = (
+            "-end_year",
+            "-start_year",
+            "degree__name",
+        )
+
+    def __str__(self):
+        period = []
+        if self.start_year:
+            period.append(str(self.start_year))
+        if self.end_year:
+            period.append(str(self.end_year))
+        years = "-".join(period) if period else "unspecified"
+        return f"{self.person} - {self.degree.name} ({years})"
 
 
 class LanguagesProficiencyLevels(models.Model):

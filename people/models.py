@@ -191,6 +191,28 @@ class Degree(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class Institution(models.Model):
+    name = models.CharField(max_length=150, unique=True)
+    description = models.TextField(blank=True, null=True)
+    location = models.ForeignKey(
+        Location,
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name="institutions",
+    )
+    website = models.URLField(blank=True, null=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("name",)
+
+    def __str__(self):
+        return self.name
     
 class  Occupation(models.Model):
     code = models.CharField(max_length=20, unique=True)   # e.g., DF,PL,AC
@@ -561,7 +583,13 @@ class PersonDegree(models.Model):
         on_delete=models.PROTECT,
         related_name="people_with_degree",
     )
-    institution = models.CharField(max_length=150, blank=True, null=True)
+    institution = models.ForeignKey(
+        Institution,
+        on_delete=models.PROTECT,
+        related_name="person_degrees",
+        blank=True,
+        null=True,
+    )
     field_of_study = models.CharField(max_length=150, blank=True, null=True)
     start_year = models.PositiveIntegerField(blank=True, null=True)
     end_year = models.PositiveIntegerField(blank=True, null=True)
@@ -584,7 +612,8 @@ class PersonDegree(models.Model):
         if self.end_year:
             period.append(str(self.end_year))
         years = "-".join(period) if period else "unspecified"
-        return f"{self.person} - {self.degree.name} ({years})"
+        institution = f" @ {self.institution}" if self.institution else ""
+        return f"{self.person} - {self.degree.name}{institution} ({years})"
 
 
 class LanguagesProficiencyLevels(models.Model):

@@ -817,7 +817,6 @@ class Marriage(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        db_table = "marriage"
         ordering = ("-married_on",)
         constraints = [
             models.UniqueConstraint(

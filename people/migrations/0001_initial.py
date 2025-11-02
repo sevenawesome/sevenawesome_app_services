@@ -40,7 +40,10 @@ class Migration(migrations.Migration):
             name='Family',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('name', models.CharField(blank=True, max_length=150, null=True)),
+                ('first_last_name', models.CharField(blank=True, max_length=150, null=True)),
+                ('second_last_name', models.CharField(blank=True, max_length=150, null=True)),
+                ('third_last_name', models.CharField(blank=True, max_length=150, null=True)),
+                ('fourth_last_name', models.CharField(blank=True, max_length=150, null=True)),
                 ('description', models.TextField(blank=True, null=True)),
                 ('is_active', models.BooleanField(default=True)),
                 ('created_at', models.DateTimeField(auto_now_add=True)),

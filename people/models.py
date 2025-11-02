@@ -928,14 +928,31 @@ class PersonAttributeAssignment(models.Model):
 
 
 class Family(models.Model):
-    name = models.CharField(max_length=150, blank=True, null=True)
+    first_last_name = models.CharField(max_length=150, blank=True, null=True)
+    second_last_name = models.CharField(max_length=150, blank=True, null=True)
+    third_last_name = models.CharField(max_length=150, blank=True, null=True)
+    fourth_last_name = models.CharField(max_length=150, blank=True, null=True)
     description = models.TextField(blank=True, null=True)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    @property
+    def full_last_name(self):
+        parts = (
+            self.first_last_name,
+            self.second_last_name,
+            self.third_last_name,
+            self.fourth_last_name,
+        )
+        return " ".join(part for part in parts if part)
+
+    @property
+    def name(self):
+        return self.full_last_name
+
     def __str__(self):
-        return self.name or f"Family #{self.pk}"
+        return self.full_last_name or f"Family #{self.pk}"
 
 
 class FamilyRole(models.Model):
@@ -962,6 +979,6 @@ class FamilyMember(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"{self.person} - {self.get_role_display()} of {self.family}"
+        return f"{self.person} - {self.role} of {self.family}"
 
 

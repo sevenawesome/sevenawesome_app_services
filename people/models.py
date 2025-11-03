@@ -865,19 +865,6 @@ class PersonLanguages(models.Model):
         identifier = self.handle or self.url or ""
         return f"{self.person} on {self.platform}{f' ({identifier})' if identifier else ''}"
 
-class PersonSocialNetwork(models.Model):
-    person = models.ForeignKey(Person,on_delete=models.CASCADE,related_name="social_profiles",)
-    platform = models.ForeignKey(SocialNetworkPlatform,on_delete=models.CASCADE,related_name="person_profiles",)
-    handle = models.CharField(max_length=150, blank=True, null=True)
-    url = models.URLField(blank=True, null=True)
-    is_primary = models.BooleanField(default=False)
-    notes = models.CharField(max_length=255, blank=True, null=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    def __str__(self):
-        identifier = self.handle or self.url or ""
-        return f"{self.person} on {self.platform}{f' ({identifier})' if identifier else ''}"
 
 class PersonSocialNetwork(models.Model):
     person = models.ForeignKey(Person,on_delete=models.CASCADE,related_name="social_profiles",)

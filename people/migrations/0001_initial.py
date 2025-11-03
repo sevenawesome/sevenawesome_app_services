@@ -27,6 +27,32 @@ class Migration(migrations.Migration):
             ],
         ),
         migrations.CreateModel(
+            name='PersonName',
+            fields=[
+                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('value', models.CharField(max_length=100, unique=True)),
+                ('normalized_value', models.CharField(editable=False, max_length=100, unique=True)),
+                ('created_at', models.DateTimeField(auto_now_add=True)),
+                ('updated_at', models.DateTimeField(auto_now=True)),
+            ],
+            options={
+                'ordering': ('normalized_value',),
+            },
+        ),
+        migrations.CreateModel(
+            name='LastName',
+            fields=[
+                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('value', models.CharField(max_length=150, unique=True)),
+                ('normalized_value', models.CharField(editable=False, max_length=150, unique=True)),
+                ('created_at', models.DateTimeField(auto_now_add=True)),
+                ('updated_at', models.DateTimeField(auto_now=True)),
+            ],
+            options={
+                'ordering': ('normalized_value',),
+            },
+        ),
+        migrations.CreateModel(
             name='EducationalLevel',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
@@ -34,20 +60,6 @@ class Migration(migrations.Migration):
                 ('label', models.CharField(max_length=50)),
                 ('description', models.CharField(blank=True, max_length=300, null=True)),
                 ('is_active', models.BooleanField(default=True)),
-            ],
-        ),
-        migrations.CreateModel(
-            name='Family',
-            fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('first_last_name', models.CharField(blank=True, max_length=150, null=True)),
-                ('second_last_name', models.CharField(blank=True, max_length=150, null=True)),
-                ('third_last_name', models.CharField(blank=True, max_length=150, null=True)),
-                ('fourth_last_name', models.CharField(blank=True, max_length=150, null=True)),
-                ('description', models.TextField(blank=True, null=True)),
-                ('is_active', models.BooleanField(default=True)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
             ],
         ),
         migrations.CreateModel(
@@ -59,6 +71,20 @@ class Migration(migrations.Migration):
                 ('description', models.TextField(blank=True, null=True)),
                 ('is_active', models.BooleanField(default=True)),
                 ('display_order', models.PositiveSmallIntegerField(default=0)),
+            ],
+        ),
+        migrations.CreateModel(
+            name='Family',
+            fields=[
+                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('description', models.TextField(blank=True, null=True)),
+                ('is_active', models.BooleanField(default=True)),
+                ('created_at', models.DateTimeField(auto_now_add=True)),
+                ('updated_at', models.DateTimeField(auto_now=True)),
+                ('first_last_name', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='families_as_first_last_name', to='people.lastname')),
+                ('second_last_name', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='families_as_second_last_name', to='people.lastname')),
+                ('third_last_name', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='families_as_third_last_name', to='people.lastname')),
+                ('fourth_last_name', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='families_as_fourth_last_name', to='people.lastname')),
             ],
         ),
         migrations.CreateModel(
@@ -176,8 +202,6 @@ class Migration(migrations.Migration):
             name='Person',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('first_name', models.CharField(max_length=100)),
-                ('last_name', models.CharField(max_length=100)),
                 ('date_of_birth', models.DateField(blank=True, null=True)),
                 ('email', models.EmailField(blank=True, max_length=254, null=True)),
                 ('housephone', models.CharField(blank=True, max_length=50, null=True)),
@@ -210,6 +234,8 @@ class Migration(migrations.Migration):
                 ('identity_type', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.DO_NOTHING, related_name='people_with_identity_type', to='people.personidentitytype')),
                 ('status', models.ForeignKey(on_delete=django.db.models.deletion.DO_NOTHING, related_name='people_with_status', to='people.personstatus')),
                 ('person_type', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.DO_NOTHING, related_name='people_with_type', to='people.persontype')),
+                ('first_name', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='people_with_first_name', to='people.personname')),
+                ('last_name', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='people_with_last_name', to='people.lastname')),
             ],
         ),
         migrations.CreateModel(

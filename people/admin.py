@@ -8,10 +8,10 @@ from .models import Family, FamilyMember, FamilyRole
 class FamilyAdmin(admin.ModelAdmin):
     list_display = ("id", "display_last_name", "is_active", "created_at")
     search_fields = (
-        "first_last_name",
-        "second_last_name",
-        "third_last_name",
-        "fourth_last_name",
+        "first_last_name__value",
+        "second_last_name__value",
+        "third_last_name__value",
+        "fourth_last_name__value",
     )
     list_filter = ("is_active",)
 
@@ -26,12 +26,12 @@ class FamilyMemberAdmin(admin.ModelAdmin):
     list_display = ("person", "family", "role", "is_primary", "joined_date", "left_date")
     list_filter = ("role", "is_primary")
     search_fields = (
-        "person__first_name",
-        "person__last_name",
-        "family__first_last_name",
-        "family__second_last_name",
-        "family__third_last_name",
-        "family__fourth_last_name",
+        "person__first_name__value",
+        "person__last_name__value",
+        "family__first_last_name__value",
+        "family__second_last_name__value",
+        "family__third_last_name__value",
+        "family__fourth_last_name__value",
     )
 
 

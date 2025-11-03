@@ -265,12 +265,73 @@ class DeathCause(models.Model):
         return self.name
     
 # --------------------------
+# Name catalog
+# --------------------------
+
+class PersonName(models.Model):
+    value = models.CharField(max_length=100, unique=True)
+    normalized_value = models.CharField(max_length=100, unique=True, editable=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("normalized_value",)
+
+    def __str__(self):
+        return self.value
+
+    def save(self, *args, **kwargs):
+        normalized = (self.value or "").strip().lower()
+        self.normalized_value = normalized
+        super().save(*args, **kwargs)
+
+
+class LastName(models.Model):
+    value = models.CharField(max_length=150, unique=True)
+    normalized_value = models.CharField(max_length=150, unique=True, editable=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("normalized_value",)
+
+    def __str__(self):
+        return self.value
+
+    def save(self, *args, **kwargs):
+        normalized = (self.value or "").strip().lower()
+        self.normalized_value = normalized
+        super().save(*args, **kwargs)
+
+# --------------------------
 # Person
 # --------------------------
 
 class Person(models.Model):
-    first_name = models.CharField(max_length=100)
-    last_name = models.CharField(max_length=100)
+    first_name = models.ForeignKey(
+        PersonName,
+        on_delete=models.PROTECT,
+        related_name="people_with_first_name",
+    )
+    second_name = models.ForeignKey(
+        PersonName,
+        on_delete=models.DO_NOTHING,
+        blank=True,
+        null=True,
+        related_name="people_with_second_name",
+    )
+    last_name = models.ForeignKey(
+        LastName,
+        on_delete=models.PROTECT,
+        related_name="people_with_last_name",
+    )
+    second_last_name = models.ForeignKey(
+        LastName,
+        on_delete=models.DO_NOTHING,
+        blank=True,
+        null=True,
+        related_name="people_with_second_last_name",
+    )
     identity_type = models.ForeignKey(
         PersonIdentityType,
         on_delete=models.DO_NOTHING,
@@ -360,7 +421,9 @@ class Person(models.Model):
     is_active = models.BooleanField(default=True)
     
     def __str__(self):
-        return f"{self.first_name} {self.last_name}"
+        first = self.first_name.value if self.first_name_id else ""
+        last = self.last_name.value if self.last_name_id else ""
+        return f"{first} {last}".strip()
 
     def get_family_members(self, role_codes=None):
         """
@@ -928,10 +991,34 @@ class PersonAttributeAssignment(models.Model):
 
 
 class Family(models.Model):
-    first_last_name = models.CharField(max_length=150, blank=True, null=True)
-    second_last_name = models.CharField(max_length=150, blank=True, null=True)
-    third_last_name = models.CharField(max_length=150, blank=True, null=True)
-    fourth_last_name = models.CharField(max_length=150, blank=True, null=True)
+    first_last_name = models.ForeignKey(
+        LastName,
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name="families_as_first_last_name",
+    )
+    second_last_name = models.ForeignKey(
+        LastName,
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name="families_as_second_last_name",
+    )
+    third_last_name = models.ForeignKey(
+        LastName,
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name="families_as_third_last_name",
+    )
+    fourth_last_name = models.ForeignKey(
+        LastName,
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name="families_as_fourth_last_name",
+    )
     description = models.TextField(blank=True, null=True)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -940,10 +1027,10 @@ class Family(models.Model):
     @property
     def full_last_name(self):
         parts = (
-            self.first_last_name,
-            self.second_last_name,
-            self.third_last_name,
-            self.fourth_last_name,
+            self.first_last_name.value if self.first_last_name_id else None,
+            self.second_last_name.value if self.second_last_name_id else None,
+            self.third_last_name.value if self.third_last_name_id else None,
+            self.fourth_last_name.value if self.fourth_last_name_id else None,
         )
         return " ".join(part for part in parts if part)
 

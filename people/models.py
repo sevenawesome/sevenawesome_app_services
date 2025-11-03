@@ -269,8 +269,8 @@ class DeathCause(models.Model):
 # --------------------------
 
 class PersonName(models.Model):
-    value = models.CharField(max_length=100, unique=True)
-    normalized_value = models.CharField(max_length=100, unique=True, editable=False)
+    value = models.CharField(max_length=100, unique=True) # value keeps the name exactly as entered so you can preserve capitalization and accents for display
+    normalized_value = models.CharField(max_length=100, unique=True, editable=False) # normalized_value is the lowercase, trimmed version that the model writes just before saving
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -303,6 +303,24 @@ class LastName(models.Model):
         self.normalized_value = normalized
         super().save(*args, **kwargs)
 
+
+class Nickname(models.Model):
+    value = models.CharField(max_length=100, unique=True)
+    normalized_value = models.CharField(max_length=100, unique=True, editable=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("normalized_value",)
+
+    def __str__(self):
+        return self.value
+
+    def save(self, *args, **kwargs):
+        normalized = (self.value or "").strip().lower()
+        self.normalized_value = normalized
+        super().save(*args, **kwargs)
+
 # --------------------------
 # Person
 # --------------------------
@@ -315,7 +333,7 @@ class Person(models.Model):
     )
     second_name = models.ForeignKey(
         PersonName,
-        on_delete=models.DO_NOTHING,
+        on_delete=models.SET_NULL,
         blank=True,
         null=True,
         related_name="people_with_second_name",
@@ -327,10 +345,17 @@ class Person(models.Model):
     )
     second_last_name = models.ForeignKey(
         LastName,
-        on_delete=models.DO_NOTHING,
+        on_delete=models.SET_NULL,
         blank=True,
         null=True,
         related_name="people_with_second_last_name",
+    )
+    nickname = models.ForeignKey(
+        Nickname,
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name="people",
     )
     identity_type = models.ForeignKey(
         PersonIdentityType,
@@ -1067,5 +1092,7 @@ class FamilyMember(models.Model):
 
     def __str__(self):
         return f"{self.person} - {self.role} of {self.family}"
+    
+
 
 

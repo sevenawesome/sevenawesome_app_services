@@ -65,7 +65,7 @@ class PersonAttributeType(models.Model):
         return self.name
 
 class Nationality(models.Model):
-    code = models.CharField(max_length=20, unique=True)
+    code = models.CharField(max_length=100, unique=True)
     label = models.CharField(max_length=100)
     is_active = models.BooleanField(default=True)
     order = models.PositiveSmallIntegerField(default=0)
@@ -74,7 +74,7 @@ class Nationality(models.Model):
         return self.label
 
 class Language(models.Model):
-    code = models.CharField(max_length=10, unique=True)   # e.g., es, en, fr
+    code = models.CharField(max_length=100, unique=True)   # e.g., es, en, fr
     label = models.CharField(max_length=100)
     is_active = models.BooleanField(default=True)
     order = models.PositiveSmallIntegerField(default=0)
@@ -83,7 +83,7 @@ class Language(models.Model):
         return self.label
 
 class Country(models.Model):
-    code = models.CharField(max_length=5, unique=True)   # e.g., DO, US
+    code = models.CharField(max_length=100, unique=True)   # e.g., DO, US
     name = models.CharField(max_length=100)
     nationality = models.ForeignKey(
         Nationality,

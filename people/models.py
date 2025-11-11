@@ -112,8 +112,8 @@ class State(models.Model):
         on_delete=models.CASCADE,
         related_name="states",
     )
-    code = models.CharField(max_length=20, blank=True, null=True)
-    name = models.CharField(max_length=100)
+    code = models.CharField(max_length=150, blank=True, null=True)
+    name = models.CharField(max_length=150)
     is_active = models.BooleanField(default=True)
     order = models.PositiveSmallIntegerField(default=0)
 
@@ -132,7 +132,7 @@ class City(models.Model):
         on_delete=models.CASCADE,
         related_name="cities",
     )
-    name = models.CharField(max_length=100)
+    name = models.CharField(max_length=150)
     is_active = models.BooleanField(default=True)
     order = models.PositiveSmallIntegerField(default=0)
 
@@ -244,9 +244,9 @@ class Institution(models.Model):
     def __str__(self):
         return self.name
     
-class  Occupation(models.Model):
-    code = models.CharField(max_length=20, unique=True)   # e.g., DF,PL,AC
-    label = models.CharField(max_length=50)   # display label plomero,ama de casa..
+class Occupation(models.Model):
+    code = models.CharField(max_length=150, unique=True)   # e.g., DF,PL,AC
+    label = models.CharField(max_length=150)   # display label plomero,ama de casa..
     description = models.CharField(max_length=300, blank=True, null=True)            
     is_active = models.BooleanField(default=True)
 

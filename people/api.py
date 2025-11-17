@@ -147,7 +147,7 @@ class PeopleTablesDataAPIView(APIView):
             {
                 "person_names": self._values_for(PersonName, active_only),
                 "last_names": self._values_for(LastName, active_only),
-                "families": self._values_for(Family, active_only),
+                "families": self._families_payload(active_only),
                 "family_roles": self._values_for(FamilyRole, active_only),
                 "nicknames": self._values_for(Nickname, active_only),
                 "person_identity_types": self._values_for(PersonIdentityType, active_only),
@@ -158,7 +158,7 @@ class PeopleTablesDataAPIView(APIView):
                 "genders": self._values_for(Gender, active_only),
                 "marital_statuses": self._values_for(MaritalStatus, active_only),
                 "occupations": self._values_for(Occupation, active_only),
-                "locations": self._values_for(Location, active_only),
+                "locations": self._locations_payload(),
             }
         )
 
@@ -193,6 +193,8 @@ class PeopleTablesDataAPIView(APIView):
                     "code": country.code,
                     "name": country.name,
                     "is_active": getattr(country, "is_active", None),
+                    "native_language": self._language_payload(country.native_language),
+                    "nationality": self._nationality_payload(country.nationality),
                     "states": [
                         {
                             "id": state.id,
@@ -213,6 +215,99 @@ class PeopleTablesDataAPIView(APIView):
                 }
             )
         return payload
+
+    def _locations_payload(self):
+        qs = (
+            Location.objects.select_related("country", "state", "city")
+            .all()
+            .order_by("id")
+        )
+        payload = []
+        for location in qs:
+            payload.append(
+                {
+                    "id": location.id,
+                    "name": location.name,
+                    "description": location.description,
+                    "address_line1": location.address_line1,
+                    "address_line2": location.address_line2,
+                    "country_id": location.country_id,
+                    "country_name": location.country.name if location.country_id else None,
+                    "state_id": location.state_id,
+                    "state_name": location.state.name if location.state_id else None,
+                    "city_id": location.city_id,
+                    "city_name": location.city.name if location.city_id else None,
+                    "latitude": location.latitude,
+                    "longitude": location.longitude,
+                    "google_maps_url": location.google_maps_url,
+                    "waze_url": location.waze_url,
+                    "notes": location.notes,
+                    "created_at": location.created_at,
+                    "updated_at": location.updated_at,
+                }
+            )
+        return payload
+
+    def _families_payload(self, active_only: bool):
+        qs = (
+            Family.objects.all()
+            .select_related(
+                "first_last_name",
+                "second_last_name",
+                "third_last_name",
+                "fourth_last_name",
+            )
+            .order_by("id")
+        )
+        if active_only:
+            qs = qs.filter(is_active=True)
+
+        def _ln_value(last_name_obj):
+            return last_name_obj.value if last_name_obj else None
+
+        def _ln_data(last_name_obj):
+            if not last_name_obj:
+                return None
+            return {
+                "id": last_name_obj.id,
+                "value": last_name_obj.value,
+                "normalized_value": last_name_obj.normalized_value,
+            }
+
+        payload = []
+        for family in qs:
+            payload.append(
+                {
+                    "id": family.id,
+                    "description": family.description,
+                    "is_active": getattr(family, "is_active", None),
+                    "created_at": family.created_at,
+                    "updated_at": family.updated_at,
+                    "first_last_name_id": family.first_last_name_id,
+                    "second_last_name_id": family.second_last_name_id,
+                    "third_last_name_id": family.third_last_name_id,
+                    "fourth_last_name_id": family.fourth_last_name_id,
+                    "first_last_name": _ln_value(family.first_last_name),
+                    "second_last_name": _ln_value(family.second_last_name),
+                    "third_last_name": _ln_value(family.third_last_name),
+                    "fourth_last_name": _ln_value(family.fourth_last_name),
+                    "first_last_name_data": _ln_data(family.first_last_name),
+                    "second_last_name_data": _ln_data(family.second_last_name),
+                    "third_last_name_data": _ln_data(family.third_last_name),
+                    "fourth_last_name_data": _ln_data(family.fourth_last_name),
+                }
+            )
+        return payload
+
+    def _language_payload(self, language):
+        if not language:
+            return None
+        return {"id": language.id, "code": language.code, "label": language.label}
+
+    def _nationality_payload(self, nationality):
+        if not nationality:
+            return None
+        return {"id": nationality.id, "code": nationality.code, "label": nationality.label}
 
     def _has_is_active(self, model) -> bool:
         return any(field.name == "is_active" for field in model._meta.fields)

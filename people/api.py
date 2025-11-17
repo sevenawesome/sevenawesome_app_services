@@ -6,7 +6,26 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
-from .models import Family, FamilyMember, PersonRelationship
+from .models import (
+    City,
+    Country,
+    EducationalLevel,
+    Family,
+    FamilyMember,
+    FamilyRole,
+    Gender,
+    Language,
+    LastName,
+    Location,
+    MaritalStatus,
+    Nationality,
+    Nickname,
+    Occupation,
+    PersonIdentityType,
+    PersonName,
+    PersonRelationship,
+    State,
+)
 from .serializers import FamilyTreeSerializer
 
 
@@ -106,6 +125,97 @@ class FamilyTreeAPIView(generics.ListAPIView):
                 "person__id",
             )
         )
+
+    def _should_include_inactive(self) -> bool:
+        flag = self.request.query_params.get("include_inactive", "")
+        return flag.lower() in {"true", "1", "yes"}
+
+
+class PeopleTablesDataAPIView(APIView):
+    """
+    Return flat exports for the requested people-related tables.
+    Defaults to active records when models expose an `is_active` flag.
+    """
+
+    authentication_classes = (JWTAuthentication,)
+    permission_classes = (IsAuthenticated,)
+
+    def get(self, request, *args, **kwargs):
+        include_inactive = self._should_include_inactive()
+        active_only = not include_inactive
+        return Response(
+            {
+                "person_names": self._values_for(PersonName, active_only),
+                "last_names": self._values_for(LastName, active_only),
+                "families": self._values_for(Family, active_only),
+                "family_roles": self._values_for(FamilyRole, active_only),
+                "nicknames": self._values_for(Nickname, active_only),
+                "person_identity_types": self._values_for(PersonIdentityType, active_only),
+                "countries": self._countries_with_states_and_cities(active_only),
+                "nationalities": self._values_for(Nationality, active_only),
+                "languages": self._values_for(Language, active_only),
+                "educational_levels": self._values_for(EducationalLevel, active_only),
+                "genders": self._values_for(Gender, active_only),
+                "marital_statuses": self._values_for(MaritalStatus, active_only),
+                "occupations": self._values_for(Occupation, active_only),
+                "locations": self._values_for(Location, active_only),
+            }
+        )
+
+    def _values_for(self, model, active_only: bool):
+        queryset = model.objects.all().order_by("id")
+        if active_only and self._has_is_active(model):
+            queryset = queryset.filter(is_active=True)
+        return list(queryset.values())
+
+    def _countries_with_states_and_cities(self, active_only: bool):
+        city_qs = City.objects.all().order_by("id")
+        if active_only:
+            city_qs = city_qs.filter(is_active=True)
+
+        state_qs = State.objects.all().order_by("id").prefetch_related(
+            Prefetch("cities", queryset=city_qs)
+        )
+        if active_only:
+            state_qs = state_qs.filter(is_active=True)
+
+        country_qs = Country.objects.all().order_by("id").prefetch_related(
+            Prefetch("states", queryset=state_qs)
+        )
+        if active_only:
+            country_qs = country_qs.filter(is_active=True)
+
+        payload = []
+        for country in country_qs:
+            payload.append(
+                {
+                    "id": country.id,
+                    "code": country.code,
+                    "name": country.name,
+                    "is_active": getattr(country, "is_active", None),
+                    "states": [
+                        {
+                            "id": state.id,
+                            "code": state.code,
+                            "name": state.name,
+                            "is_active": getattr(state, "is_active", None),
+                            "cities": [
+                                {
+                                    "id": city.id,
+                                    "name": city.name,
+                                    "is_active": getattr(city, "is_active", None),
+                                }
+                                for city in state.cities.all()
+                            ],
+                        }
+                        for state in country.states.all()
+                    ],
+                }
+            )
+        return payload
+
+    def _has_is_active(self, model) -> bool:
+        return any(field.name == "is_active" for field in model._meta.fields)
 
     def _should_include_inactive(self) -> bool:
         flag = self.request.query_params.get("include_inactive", "")
